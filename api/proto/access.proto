@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package access;
+
+option go_package = "github.com/onix-air/contacts/api/proto/access;access";
+
+service AccessService {
+  rpc Check(CheckRequest) returns (CheckResponse);
+}
+
+message CheckRequest {
+  string client_id = 1;
+  string consumer_id = 2;
+  string contract_name = 3;
+  string direction = 4;
+}
+
+message CheckResponse {
+  bool allowed = 1;
+}

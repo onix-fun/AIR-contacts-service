@@ -1,0 +1,42 @@
+# Binaries
+device-ws
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Output of coverage
+*.out
+coverage.html
+
+# Go build cache
+.go/bin/
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Proto generated files in other locations
+github.com/
+
+# Docker
+.dockerignore
+
+# Logs
+*.log

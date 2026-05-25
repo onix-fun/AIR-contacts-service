@@ -1,0 +1,12 @@
+user contacts-service
+topic readwrite devices/+/commands
+topic readwrite devices/+/responses
+topic readwrite devices/+/events
+
+# Allow devices to read their own commands and write their responses/events
+pattern read devices/%u/commands
+pattern write devices/%u/responses
+pattern write devices/%u/events
+
+# Allow anonymous health check
+topic read $SYS/#

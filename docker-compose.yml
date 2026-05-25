@@ -1,0 +1,109 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: contacts-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - contacts-network
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: contacts-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/#", "-C", "1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - contacts-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: contacts-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - contacts-network
+
+  analytics:
+    build:
+      context: ../analytics
+      dockerfile: Dockerfile.dev
+    container_name: contacts-analytics
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_URI: "redis://redis:6379"
+      REDIS_STREAM: "analytics.events"
+      REDIS_GROUP: "analytics-writer"
+      REDIS_CONSUMER: "analytics-1"
+      CLICKHOUSE_JDBC_URL: "jdbc:clickhouse://clickhouse:8123/default"
+      CLICKHOUSE_USERNAME: "default"
+      CLICKHOUSE_PASSWORD: ""
+      ACCESS_SERVICE_ADDR: "host.docker.internal:9090"
+      WORKER_ENABLED: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - contacts-network
+    restart: unless-stopped
+
+  device-ws:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: contacts-device-ws
+    ports:
+      - "8080:8080"
+    environment:
+      HTTP_ADDR: ":8080"
+      REDIS_ADDR: "redis:6379"
+      ANALYTICS_STREAM: "analytics.events"
+      MQTT_BROKER: "tcp://mosquitto:1883"
+      MQTT_USERNAME: "contacts-service"
+      ACCESS_SERVICE_ADDR: "host.docker.internal:9090"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - contacts-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  clickhouse_data:
+  mosquitto_data:
+  mosquitto_logs:
+
+networks:
+  contacts-network:
+    driver: bridge
