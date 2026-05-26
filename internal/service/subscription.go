@@ -5,19 +5,29 @@ import (
 	"log"
 	"time"
 
-	"github.com/onix-air/contacts/internal/client"
 	"github.com/onix-air/contacts/internal/model"
 )
 
 type SubscriptionManager struct {
-	redis *client.RedisClient
-	ttl   time.Duration
+	redis  subscriptionStorage
+	ttl    time.Duration
 	logger *log.Logger
 }
 
 const DefaultSubscriptionTTL = 1 * time.Hour
 
-func NewSubscriptionManager(redis *client.RedisClient) *SubscriptionManager {
+type subscriptionStorage interface {
+	AddSubscription(context.Context, string, string, string, time.Duration) error
+	SetSubscriptionExpiry(context.Context, string, string, time.Duration) error
+	GetSubscriptions(context.Context, string, string) ([]string, error)
+	RemoveSubscription(context.Context, string, string, string) error
+	SetConnectionMetadata(context.Context, string, interface{}, time.Duration) error
+	GetConnectionMetadata(context.Context, string, interface{}) error
+	DeleteConnectionMetadata(context.Context, string) error
+	RemoveAllConnectionSubscriptions(context.Context, string) error
+}
+
+func NewSubscriptionManager(redis subscriptionStorage) *SubscriptionManager {
 	return &SubscriptionManager{
 		redis:  redis,
 		ttl:    DefaultSubscriptionTTL,

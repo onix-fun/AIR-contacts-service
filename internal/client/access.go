@@ -18,8 +18,10 @@ type AccessServiceClient struct {
 	client pb.AccessServiceClient
 }
 
+var dialGRPC = grpc.Dial
+
 func NewAccessServiceClient(addr string) (*AccessServiceClient, error) {
-	conn, err := grpc.Dial(
+	conn, err := dialGRPC(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),

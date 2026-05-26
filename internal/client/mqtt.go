@@ -17,6 +17,8 @@ type MQTTClient struct {
 	client mqtt.Client
 }
 
+var newMQTTClient = mqtt.NewClient
+
 func NewMQTTClient(brokerURL, username, password string) (*MQTTClient, error) {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(brokerURL)
@@ -32,7 +34,7 @@ func NewMQTTClient(brokerURL, username, password string) (*MQTTClient, error) {
 	opts.SetMaxReconnectInterval(10 * time.Second)
 	opts.ConnectTimeout = 5 * time.Second
 
-	client := mqtt.NewClient(opts)
+	client := newMQTTClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}

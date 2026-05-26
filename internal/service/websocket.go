@@ -12,7 +12,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/onix-air/contacts/internal/client"
 	"github.com/onix-air/contacts/internal/model"
 	"github.com/onix-air/contacts/internal/observability"
 )
@@ -32,11 +31,11 @@ const (
 )
 
 type WebSocketService struct {
-	redis          *client.RedisClient
-	mqtt           *client.MQTTClient
-	access         *client.AccessServiceClient
-	requestMgr     *RequestManager
-	subsMgr        *SubscriptionManager
+	redis          analyticsPublisher
+	mqtt           mqttGateway
+	access         accessChecker
+	requestMgr     requestManager
+	subsMgr        subscriptionManager
 	logger         *log.Logger
 	connections    sync.Map // map[string]*websocket.Conn
 	connectionInfo sync.Map // map[string]connectionInfo
@@ -47,12 +46,43 @@ type connectionInfo struct {
 	Mode     string
 }
 
+type analyticsPublisher interface {
+	PublishAnalyticsEvent(context.Context, *model.AnalyticsEvent) error
+}
+
+type mqttGateway interface {
+	PublishCommand(interface{}, string) error
+	GetClient() mqtt.Client
+}
+
+type accessChecker interface {
+	Check(context.Context, string, string, string, string) (bool, error)
+}
+
+type requestManager interface {
+	StoreRequest(context.Context, string, *model.RequestMetadata) error
+	GetRequest(context.Context, string) (*model.RequestMetadata, error)
+	DeleteRequest(context.Context, string) error
+}
+
+type subscriptionManager interface {
+	AddSubscription(context.Context, string, string, string) error
+	RemoveSubscription(context.Context, string, string, string) error
+	GetSubscribers(context.Context, string, string) ([]string, error)
+	SaveConnectionMetadata(context.Context, string, *model.SubscriptionMetadata) error
+	GetConnectionMetadata(context.Context, string) (*model.SubscriptionMetadata, error)
+	RemoveConnectionMetadata(context.Context, string) error
+	RemoveAllConnectionSubscriptions(context.Context, string) error
+}
+
+var commandResponseTimeout = 10 * time.Second
+
 func NewWebSocketService(
-	redis *client.RedisClient,
-	mqtt *client.MQTTClient,
-	access *client.AccessServiceClient,
-	requestMgr *RequestManager,
-	subsMgr *SubscriptionManager,
+	redis analyticsPublisher,
+	mqtt mqttGateway,
+	access accessChecker,
+	requestMgr requestManager,
+	subsMgr subscriptionManager,
 	logger *log.Logger,
 ) *WebSocketService {
 	return &WebSocketService{
@@ -267,7 +297,7 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 	))
 
 	// Schedule timeout check
-	time.AfterFunc(10*time.Second, func() {
+	time.AfterFunc(commandResponseTimeout, func() {
 		bgCtx := context.Background()
 		_, err := ws.requestMgr.GetRequest(bgCtx, req.RequestID)
 		if err == nil {

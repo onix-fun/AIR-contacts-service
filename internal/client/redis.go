@@ -16,8 +16,10 @@ type RedisClient struct {
 	logger          *log.Logger
 }
 
+var newGoRedisClient = redis.NewClient
+
 func NewRedisClient(ctx context.Context, addr string, analyticsStream ...string) (*RedisClient, error) {
-	client := redis.NewClient(&redis.Options{
+	client := newGoRedisClient(&redis.Options{
 		Addr:         addr,
 		DialTimeout:  5 * time.Second,
 		ReadTimeout:  3 * time.Second,
