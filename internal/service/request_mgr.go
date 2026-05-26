@@ -5,18 +5,23 @@ import (
 	"log"
 	"time"
 
-	"github.com/onix-air/contacts/internal/client"
 	"github.com/onix-air/contacts/internal/model"
 )
 
 type RequestManager struct {
-	redis   *client.RedisClient
-	ttl     time.Duration
+	redis    requestStorage
+	ttl      time.Duration
 	timeouts map[string]*time.Timer // For handling timeouts
-	logger  *log.Logger
+	logger   *log.Logger
 }
 
-func NewRequestManager(redis *client.RedisClient, ttl time.Duration) *RequestManager {
+type requestStorage interface {
+	SetRequest(context.Context, string, interface{}, time.Duration) error
+	GetRequest(context.Context, string, interface{}) error
+	DeleteRequest(context.Context, string) error
+}
+
+func NewRequestManager(redis requestStorage, ttl time.Duration) *RequestManager {
 	return &RequestManager{
 		redis:    redis,
 		ttl:      ttl,

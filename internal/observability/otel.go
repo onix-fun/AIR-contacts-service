@@ -28,12 +28,19 @@ type ShutdownFunc func(context.Context) error
 
 type correlationIDContextKey struct{}
 
+var (
+	mergeResources         = resource.Merge
+	newTraceExporter       = otlptracehttp.New
+	newMetricExporter      = otlpmetrichttp.New
+	startRuntimeCollection = otelruntime.Start
+)
+
 func Init(ctx context.Context) (ShutdownFunc, error) {
 	if strings.EqualFold(os.Getenv("OTEL_SDK_DISABLED"), "true") {
 		return func(context.Context) error { return nil }, nil
 	}
 
-	res, err := resource.Merge(
+	res, err := mergeResources(
 		resource.Default(),
 		resource.NewWithAttributes("", resourceAttributes()...),
 	)
@@ -41,12 +48,12 @@ func Init(ctx context.Context) (ShutdownFunc, error) {
 		return nil, err
 	}
 
-	traceExporter, err := otlptracehttp.New(ctx)
+	traceExporter, err := newTraceExporter(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	metricExporter, err := otlpmetrichttp.New(ctx)
+	metricExporter, err := newMetricExporter(ctx)
 	if err != nil {
 		_ = traceExporter.Shutdown(ctx)
 		return nil, err
@@ -64,7 +71,7 @@ func Init(ctx context.Context) (ShutdownFunc, error) {
 
 	otel.SetTracerProvider(tracerProvider)
 	otel.SetMeterProvider(meterProvider)
-	if err := otelruntime.Start(
+	if err := startRuntimeCollection(
 		otelruntime.WithMeterProvider(meterProvider),
 		otelruntime.WithMinimumReadMemStatsInterval(15*time.Second),
 	); err != nil {
