@@ -529,19 +529,12 @@ func (ws *WebSocketService) UnsubscribeFromEvents(ctx context.Context, clientID 
 
 // ListenMQTTResponses listens for device responses and matches them with requests
 func (ws *WebSocketService) ListenMQTTResponses(ctx context.Context) error {
-	// We need to subscribe to all possible response topics
-	// For a scalable solution, we'd use MQTT wildcards or a pattern subscription
-	// For now, we'll use a global subscription mechanism
-
 	handler := func(c mqtt.Client, msg mqtt.Message) {
 		ws.handleMQTTResponse(ctx, msg.Payload())
 	}
 
-	// Subscribe to wildcard topic for all responses if supported
-	// Otherwise, we'll need to subscribe to specific consumers as they connect
-	token := ws.mqtt.GetClient().Subscribe("devices/+/responses", byte(QoSAtLeastOnce), handler)
-	if token.Wait() && token.Error() != nil {
-		return token.Error()
+	if err := ws.mqtt.SubscribePersistent("devices/+/responses", handler); err != nil {
+		return err
 	}
 
 	ws.logger.Println("Subscribed to MQTT response topic: devices/+/responses")
@@ -555,10 +548,8 @@ func (ws *WebSocketService) ListenMQTTEvents(ctx context.Context) error {
 		ws.handleMQTTEvent(ctx, msg.Payload())
 	}
 
-	// Subscribe to wildcard topic for all events
-	token := ws.mqtt.GetClient().Subscribe("devices/+/events", byte(QoSAtLeastOnce), handler)
-	if token.Wait() && token.Error() != nil {
-		return token.Error()
+	if err := ws.mqtt.SubscribePersistent("devices/+/events", handler); err != nil {
+		return err
 	}
 
 	ws.logger.Println("Subscribed to MQTT event topic: devices/+/events")
