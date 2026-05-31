@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +34,11 @@ func (h *SocketHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		h.reject(r.Context(), w, clientID, "invalid_client_id", "BAD_REQUEST", "Invalid X-Client-ID format")
 		return
 	}
+	expiresAt, err := accessExpiry(r)
+	if err != nil {
+		h.reject(r.Context(), w, clientID, "invalid_access_expiry", "UNAUTHORIZED", err.Error())
+		return
+	}
 
 	conn, err := h.service.UpgradeConnection(w, r)
 	if err != nil {
@@ -39,6 +46,8 @@ func (h *SocketHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+	expiryTimer := closeConnectionAtExpiry(conn, expiresAt)
+	defer expiryTimer.Stop()
 
 	connectionID := service.GenerateConnectionID()
 	h.service.StoreConnection(connectionID, conn)
@@ -81,6 +90,27 @@ func (h *SocketHandler) Handle(w http.ResponseWriter, r *http.Request) {
 			h.sendError(connectionID, message.RequestID, "INVALID_MESSAGE", "Unknown WebSocket message type")
 		}
 	}
+}
+
+func closeConnectionAtExpiry(conn *websocket.Conn, expiresAt time.Time) *time.Timer {
+	return time.AfterFunc(time.Until(expiresAt), func() {
+		deadline := time.Now().Add(time.Second)
+		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Session expired"), deadline)
+		_ = conn.Close()
+	})
+}
+
+func accessExpiry(r *http.Request) (time.Time, error) {
+	raw := r.Header.Get("X-Access-Expires-At")
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("Missing or invalid access token expiry")
+	}
+	expiresAt := time.Unix(value, 0)
+	if !expiresAt.After(time.Now()) {
+		return time.Time{}, fmt.Errorf("Access token expired")
+	}
+	return expiresAt, nil
 }
 
 func (h *SocketHandler) reject(ctx context.Context, w http.ResponseWriter, clientID, action, code, message string) {

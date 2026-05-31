@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,9 +21,7 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // In production, implement proper origin check
-	},
+	CheckOrigin:     isAllowedWebSocketOrigin,
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
@@ -29,6 +30,7 @@ const (
 	QoSAtLeastOnce = 1
 	AccessRead     = "READ"
 	AccessWrite    = "WRITE"
+	maxMessageSize = 64 * 1024
 )
 
 type WebSocketService struct {
@@ -71,7 +73,39 @@ func (ws *WebSocketService) UpgradeConnection(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		return nil, err
 	}
+	conn.SetReadLimit(maxMessageSize)
 	return conn, nil
+}
+
+func isAllowedWebSocketOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return false
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil ||
+		parsed.Scheme == "" ||
+		parsed.Host == "" ||
+		parsed.User != nil ||
+		parsed.Path != "" ||
+		parsed.RawQuery != "" ||
+		parsed.Fragment != "" ||
+		parsed.ForceQuery ||
+		strings.HasSuffix(parsed.Host, ":") {
+		return false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	host := strings.ToLower(parsed.Hostname())
+	if host == "localhost" || host == "127.0.0.1" {
+		return scheme == "http" || scheme == "https"
+	}
+
+	baseDomain := strings.ToLower(strings.TrimSpace(os.Getenv("SPARROW_TRUSTED_BASE_DOMAIN")))
+	if baseDomain == "" || scheme != "https" {
+		return false
+	}
+	return host == baseDomain || strings.HasSuffix(host, "."+baseDomain)
 }
 
 // StoreConnection stores connection in memory

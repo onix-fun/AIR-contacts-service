@@ -65,6 +65,7 @@ services:
       CLICKHOUSE_USERNAME: "default"
       CLICKHOUSE_PASSWORD: ""
       ACCESS_SERVICE_ADDR: "host.docker.internal:9090"
+      SPARROW_TRUSTED_BASE_DOMAIN: "localhost"
       WORKER_ENABLED: "true"
     depends_on:
       redis:
