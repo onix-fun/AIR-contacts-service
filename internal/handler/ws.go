@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/onix-air/contacts/internal/errorcatalog"
 	"github.com/onix-air/contacts/internal/model"
 	"github.com/onix-air/contacts/internal/observability"
 	"github.com/onix-air/contacts/internal/service"
@@ -87,7 +88,7 @@ func (h *SocketHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		case "ping":
 			_ = h.service.SendMessage(conn, &model.WSResponse{Type: "pong", Timestamp: time.Now().UTC().Format(time.RFC3339)})
 		default:
-			h.sendError(connectionID, message.RequestID, "INVALID_MESSAGE", "Unknown WebSocket message type")
+			h.sendError(connectionID, message.RequestID, "INVALID_MESSAGE")
 		}
 	}
 }
@@ -135,17 +136,17 @@ func (h *SocketHandler) handleCommand(ctx context.Context, clientID, connectionI
 		message.RequestID = uuid.NewString()
 	}
 	req := &model.WriteRequest{
-		RequestID:    message.RequestID,
-		ConsumerID:   message.ConsumerID,
-		ContractName: message.ContractName,
-		Payload:      message.Payload,
+		RequestID:  message.RequestID,
+		ConsumerID: message.ConsumerID,
+		MethodName: message.MethodName,
+		Input:      message.Input,
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	if _, err := h.service.ExecuteWrite(reqCtx, clientID, req, connectionID); err != nil {
-		h.sendError(connectionID, req.RequestID, err.Error(), errorMessage(err.Error()))
+		h.sendError(connectionID, req.RequestID, err.Error())
 	}
 }
 
@@ -155,10 +156,10 @@ func (h *SocketHandler) handleSubscribe(ctx context.Context, clientID, connectio
 
 	result, err := h.service.SubscribeToEvents(reqCtx, clientID, &model.ReadSubscribeRequest{
 		ConsumerID: message.ConsumerID,
-		Contracts:  message.Contracts,
+		Variables:  message.Variables,
 	}, connectionID)
 	if err != nil {
-		h.sendError(connectionID, message.RequestID, err.Error(), errorMessage(err.Error()))
+		h.sendError(connectionID, message.RequestID, err.Error())
 		return
 	}
 	if conn, ok := h.service.GetConnection(connectionID); ok {
@@ -175,10 +176,10 @@ func (h *SocketHandler) handleSubscribe(ctx context.Context, clientID, connectio
 func (h *SocketHandler) handleUnsubscribe(ctx context.Context, clientID, connectionID string, message model.WSClientMessage) {
 	result, err := h.service.UnsubscribeFromEvents(ctx, clientID, &model.ReadSubscribeRequest{
 		ConsumerID: message.ConsumerID,
-		Contracts:  message.Contracts,
+		Variables:  message.Variables,
 	}, connectionID)
 	if err != nil {
-		h.sendError(connectionID, message.RequestID, err.Error(), errorMessage(err.Error()))
+		h.sendError(connectionID, message.RequestID, err.Error())
 		return
 	}
 	if conn, ok := h.service.GetConnection(connectionID); ok {
@@ -191,28 +192,15 @@ func (h *SocketHandler) handleUnsubscribe(ctx context.Context, clientID, connect
 	}
 }
 
-func (h *SocketHandler) sendError(connectionID, requestID, code, message string) {
+func (h *SocketHandler) sendError(connectionID, requestID, code string) {
+	entry := errorcatalog.ByCode(code)
 	if conn, ok := h.service.GetConnection(connectionID); ok {
 		_ = h.service.SendMessage(conn, &model.WSResponse{
-			Type:      "error",
-			RequestID: requestID,
-			Code:      code,
-			Message:   message,
+			Type:       "error",
+			RequestID:  requestID,
+			StatusCode: entry.StatusCode,
+			Code:       entry.Code,
+			Message:    entry.Message,
 		})
 	}
-}
-
-func errorMessage(code string) string {
-	messages := map[string]string{
-		"INVALID_MESSAGE":     "Invalid message format",
-		"ACCESS_DENIED":       "Access denied",
-		"INTERNAL_ERROR":      "Internal error",
-		"MQTT_PUBLISH_FAILED": "Failed to publish to device",
-		"TIMEOUT":             "Device response timeout",
-		"INVALID_CONTRACT":    "Invalid contract name",
-	}
-	if message, ok := messages[code]; ok {
-		return message
-	}
-	return "Unknown error"
 }

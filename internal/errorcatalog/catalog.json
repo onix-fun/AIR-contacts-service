@@ -1,0 +1,13 @@
+{
+  "200": {"code":"OK","message":"Success"},
+  "400": {"code":"INVALID_MESSAGE","message":"Invalid message format"},
+  "403": {"code":"ACCESS_DENIED","message":"Access denied"},
+  "404": {"code":"INVALID_METHOD","message":"Invalid method name"},
+  "408": {"code":"TIMEOUT","message":"Device response timeout"},
+  "500": {"code":"INTERNAL_ERROR","message":"Internal error"},
+  "502": {"code":"MQTT_PUBLISH_FAILED","message":"Failed to publish to device"},
+  "1000": {"code":"DEVICE_ERROR","message":"Device error"},
+  "1001": {"code":"INVALID_ARGUMENT","message":"Invalid method argument"},
+  "1002": {"code":"UNSUPPORTED_METHOD","message":"Method is not supported by device"},
+  "1003": {"code":"DEVICE_BUSY","message":"Device is busy"}
+}

@@ -10,10 +10,10 @@ import (
 )
 
 type RequestManager struct {
-	redis   *client.RedisClient
-	ttl     time.Duration
+	redis    *client.RedisClient
+	ttl      time.Duration
 	timeouts map[string]*time.Timer // For handling timeouts
-	logger  *log.Logger
+	logger   *log.Logger
 }
 
 func NewRequestManager(redis *client.RedisClient, ttl time.Duration) *RequestManager {

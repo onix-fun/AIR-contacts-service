@@ -69,26 +69,26 @@ func (rc *RedisClient) DeleteRequest(ctx context.Context, requestID string) erro
 }
 
 // AddSubscription adds connection to subscription set
-func (rc *RedisClient) AddSubscription(ctx context.Context, consumerID, contractName, connectionID string, ttl time.Duration) error {
-	key := "ws:subs:" + consumerID + ":" + contractName
+func (rc *RedisClient) AddSubscription(ctx context.Context, consumerID, variableName, connectionID string, ttl time.Duration) error {
+	key := "ws:subs:" + consumerID + ":" + variableName
 	return rc.client.SAdd(ctx, key, connectionID).Err()
 }
 
 // SetSubscriptionExpiry sets expiry for subscription key
-func (rc *RedisClient) SetSubscriptionExpiry(ctx context.Context, consumerID, contractName string, ttl time.Duration) error {
-	key := "ws:subs:" + consumerID + ":" + contractName
+func (rc *RedisClient) SetSubscriptionExpiry(ctx context.Context, consumerID, variableName string, ttl time.Duration) error {
+	key := "ws:subs:" + consumerID + ":" + variableName
 	return rc.client.Expire(ctx, key, ttl).Err()
 }
 
-// GetSubscriptions gets all connection IDs for a contract
-func (rc *RedisClient) GetSubscriptions(ctx context.Context, consumerID, contractName string) ([]string, error) {
-	key := "ws:subs:" + consumerID + ":" + contractName
+// GetSubscriptions gets all connection IDs for a variable
+func (rc *RedisClient) GetSubscriptions(ctx context.Context, consumerID, variableName string) ([]string, error) {
+	key := "ws:subs:" + consumerID + ":" + variableName
 	return rc.client.SMembers(ctx, key).Result()
 }
 
 // RemoveSubscription removes connection from subscription set
-func (rc *RedisClient) RemoveSubscription(ctx context.Context, consumerID, contractName, connectionID string) error {
-	key := "ws:subs:" + consumerID + ":" + contractName
+func (rc *RedisClient) RemoveSubscription(ctx context.Context, consumerID, variableName, connectionID string) error {
+	key := "ws:subs:" + consumerID + ":" + variableName
 	return rc.client.SRem(ctx, key, connectionID).Err()
 }
 

@@ -9,51 +9,47 @@ import (
 
 // WriteRequest - message from user for command execution
 type WriteRequest struct {
-	RequestID    string          `json:"request_id"`
-	ConsumerID   string          `json:"consumer_id"`
-	ContractName string          `json:"contract_name"`
-	Payload      json.RawMessage `json:"payload"`
+	RequestID  string          `json:"request_id"`
+	ConsumerID string          `json:"consumer_id"`
+	MethodName string          `json:"method_name"`
+	Input      json.RawMessage `json:"input,omitempty"`
 }
 
 // ReadSubscribeRequest - message from user for event subscription
 type ReadSubscribeRequest struct {
 	ConsumerID string   `json:"consumer_id"`
-	Contracts  []string `json:"contracts"`
+	Variables  []string `json:"variables"`
 }
 
 // WSClientMessage is the single WebSocket command envelope.
 type WSClientMessage struct {
-	Type         string          `json:"type"`
-	RequestID    string          `json:"request_id,omitempty"`
-	ConsumerID   string          `json:"consumer_id,omitempty"`
-	ContractName string          `json:"contract_name,omitempty"`
-	Contracts    []string        `json:"contracts,omitempty"`
-	Payload      json.RawMessage `json:"payload,omitempty"`
+	Type       string          `json:"type"`
+	RequestID  string          `json:"request_id,omitempty"`
+	ConsumerID string          `json:"consumer_id,omitempty"`
+	MethodName string          `json:"method_name,omitempty"`
+	Variables  []string        `json:"variables,omitempty"`
+	Input      json.RawMessage `json:"input,omitempty"`
 }
 
 // MQTTCommandPayload - payload for MQTT command topic
 type MQTTCommandPayload struct {
-	RequestID    string          `json:"request_id"`
-	ConsumerID   string          `json:"consumer_id"`
-	ContractName string          `json:"contract_name"`
-	Payload      json.RawMessage `json:"payload"`
-	Timestamp    string          `json:"ts"`
+	RequestID  string          `json:"request_id"`
+	ConsumerID string          `json:"consumer_id"`
+	MethodName string          `json:"method_name"`
+	Input      json.RawMessage `json:"input,omitempty"`
+	Timestamp  string          `json:"ts"`
 }
 
 // MQTTResponsePayload - payload from MQTT response topic
 type MQTTResponsePayload struct {
-	RequestID    string          `json:"request_id"`
-	ConsumerID   string          `json:"consumer_id"`
-	ContractName string          `json:"contract_name"`
-	Status       string          `json:"status"`
-	Payload      json.RawMessage `json:"payload"`
-	Timestamp    string          `json:"ts"`
+	RequestID  string `json:"request_id"`
+	StatusCode int    `json:"status_code"`
 }
 
 // MQTTEventPayload - payload from MQTT event topic
 type MQTTEventPayload struct {
 	ConsumerID   string          `json:"consumer_id"`
-	ContractName string          `json:"contract_name"`
+	VariableName string          `json:"variable_name"`
 	Payload      json.RawMessage `json:"payload"`
 	Timestamp    string          `json:"ts"`
 }
@@ -63,8 +59,9 @@ type WSResponse struct {
 	Type         string          `json:"type"` // "success", "event", "error"
 	RequestID    string          `json:"request_id,omitempty"`
 	ConsumerID   string          `json:"consumer_id,omitempty"`
-	ContractName string          `json:"contract_name,omitempty"`
+	VariableName string          `json:"variable_name,omitempty"`
 	Status       string          `json:"status,omitempty"`
+	StatusCode   int             `json:"status_code,omitempty"`
 	Code         string          `json:"code,omitempty"`
 	Message      string          `json:"message,omitempty"`
 	Payload      json.RawMessage `json:"payload,omitempty"`
@@ -91,7 +88,7 @@ type ErrorResponse struct {
 type RequestMetadata struct {
 	ClientID     string
 	ConsumerID   string
-	ContractName string
+	MethodName   string
 	ConnectionID string
 }
 
@@ -99,7 +96,7 @@ type RequestMetadata struct {
 type SubscriptionMetadata struct {
 	ClientID   string
 	ConsumerID string
-	Contracts  []string
+	Variables  []string
 }
 
 // AnalyticsEvent is written to Redis Streams and consumed by the analytics service.
@@ -112,8 +109,10 @@ type AnalyticsEvent struct {
 	ConnectionID string                 `json:"connection_id,omitempty"`
 	RequestID    string                 `json:"request_id,omitempty"`
 	ConsumerID   string                 `json:"consumer_id,omitempty"`
-	ContractName string                 `json:"contract_name,omitempty"`
+	MethodName   string                 `json:"method_name,omitempty"`
+	VariableName string                 `json:"variable_name,omitempty"`
 	Status       string                 `json:"status,omitempty"`
+	StatusCode   *int                   `json:"status_code,omitempty"`
 	ErrorCode    string                 `json:"error_code,omitempty"`
 	ErrorMessage string                 `json:"error_message,omitempty"`
 	Payload      json.RawMessage        `json:"payload,omitempty"`

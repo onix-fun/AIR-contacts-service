@@ -10,8 +10,8 @@ import (
 )
 
 type SubscriptionManager struct {
-	redis *client.RedisClient
-	ttl   time.Duration
+	redis  *client.RedisClient
+	ttl    time.Duration
 	logger *log.Logger
 }
 
@@ -26,21 +26,21 @@ func NewSubscriptionManager(redis *client.RedisClient) *SubscriptionManager {
 }
 
 // AddSubscription adds connection to subscription set
-func (sm *SubscriptionManager) AddSubscription(ctx context.Context, consumerID, contractName, connectionID string) error {
-	if err := sm.redis.AddSubscription(ctx, consumerID, contractName, connectionID, sm.ttl); err != nil {
+func (sm *SubscriptionManager) AddSubscription(ctx context.Context, consumerID, variableName, connectionID string) error {
+	if err := sm.redis.AddSubscription(ctx, consumerID, variableName, connectionID, sm.ttl); err != nil {
 		return err
 	}
-	return sm.redis.SetSubscriptionExpiry(ctx, consumerID, contractName, sm.ttl)
+	return sm.redis.SetSubscriptionExpiry(ctx, consumerID, variableName, sm.ttl)
 }
 
 // RemoveSubscription removes connection from subscription set
-func (sm *SubscriptionManager) RemoveSubscription(ctx context.Context, consumerID, contractName, connectionID string) error {
-	return sm.redis.RemoveSubscription(ctx, consumerID, contractName, connectionID)
+func (sm *SubscriptionManager) RemoveSubscription(ctx context.Context, consumerID, variableName, connectionID string) error {
+	return sm.redis.RemoveSubscription(ctx, consumerID, variableName, connectionID)
 }
 
-// GetSubscribers returns all connection IDs subscribed to a contract
-func (sm *SubscriptionManager) GetSubscribers(ctx context.Context, consumerID, contractName string) ([]string, error) {
-	return sm.redis.GetSubscriptions(ctx, consumerID, contractName)
+// GetSubscribers returns all connection IDs subscribed to a variable
+func (sm *SubscriptionManager) GetSubscribers(ctx context.Context, consumerID, variableName string) ([]string, error) {
+	return sm.redis.GetSubscriptions(ctx, consumerID, variableName)
 }
 
 // SaveConnectionMetadata saves connection subscription metadata

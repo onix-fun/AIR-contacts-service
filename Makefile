@@ -24,7 +24,7 @@ proto:
 	@echo "Generating proto code..."
 	protoc --go_out=. --go-grpc_out=. api/proto/access.proto
 	mkdir -p internal/proto
-	mv github.com/onix-air/contacts/internal/proto/*.go internal/proto/ 2>/dev/null || true
+	mv github.com/onix-air/contacts/api/proto/access/*.go internal/proto/
 	rm -rf github.com
 
 deps:

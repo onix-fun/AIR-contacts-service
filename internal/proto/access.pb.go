@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.1
-// source: access.proto
+// source: api/proto/access.proto
 
 package access
 
@@ -21,19 +21,68 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ResourceType int32
+
+const (
+	ResourceType_RESOURCE_TYPE_UNSPECIFIED ResourceType = 0
+	ResourceType_METHOD                    ResourceType = 1
+	ResourceType_VARIABLE                  ResourceType = 2
+)
+
+// Enum value maps for ResourceType.
+var (
+	ResourceType_name = map[int32]string{
+		0: "RESOURCE_TYPE_UNSPECIFIED",
+		1: "METHOD",
+		2: "VARIABLE",
+	}
+	ResourceType_value = map[string]int32{
+		"RESOURCE_TYPE_UNSPECIFIED": 0,
+		"METHOD":                    1,
+		"VARIABLE":                  2,
+	}
+)
+
+func (x ResourceType) Enum() *ResourceType {
+	p := new(ResourceType)
+	*p = x
+	return p
+}
+
+func (x ResourceType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResourceType) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_proto_access_proto_enumTypes[0].Descriptor()
+}
+
+func (ResourceType) Type() protoreflect.EnumType {
+	return &file_api_proto_access_proto_enumTypes[0]
+}
+
+func (x ResourceType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResourceType.Descriptor instead.
+func (ResourceType) EnumDescriptor() ([]byte, []int) {
+	return file_api_proto_access_proto_rawDescGZIP(), []int{0}
+}
+
 type CheckRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	ConsumerId    string                 `protobuf:"bytes,2,opt,name=consumer_id,json=consumerId,proto3" json:"consumer_id,omitempty"`
-	ContractName  string                 `protobuf:"bytes,3,opt,name=contract_name,json=contractName,proto3" json:"contract_name,omitempty"`
-	Direction     string                 `protobuf:"bytes,4,opt,name=direction,proto3" json:"direction,omitempty"`
+	ResourceName  string                 `protobuf:"bytes,3,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
+	ResourceType  ResourceType           `protobuf:"varint,4,opt,name=resource_type,json=resourceType,proto3,enum=access.ResourceType" json:"resource_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CheckRequest) Reset() {
 	*x = CheckRequest{}
-	mi := &file_access_proto_msgTypes[0]
+	mi := &file_api_proto_access_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +94,7 @@ func (x *CheckRequest) String() string {
 func (*CheckRequest) ProtoMessage() {}
 
 func (x *CheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_access_proto_msgTypes[0]
+	mi := &file_api_proto_access_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +107,7 @@ func (x *CheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckRequest.ProtoReflect.Descriptor instead.
 func (*CheckRequest) Descriptor() ([]byte, []int) {
-	return file_access_proto_rawDescGZIP(), []int{0}
+	return file_api_proto_access_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CheckRequest) GetClientId() string {
@@ -75,18 +124,18 @@ func (x *CheckRequest) GetConsumerId() string {
 	return ""
 }
 
-func (x *CheckRequest) GetContractName() string {
+func (x *CheckRequest) GetResourceName() string {
 	if x != nil {
-		return x.ContractName
+		return x.ResourceName
 	}
 	return ""
 }
 
-func (x *CheckRequest) GetDirection() string {
+func (x *CheckRequest) GetResourceType() ResourceType {
 	if x != nil {
-		return x.Direction
+		return x.ResourceType
 	}
-	return ""
+	return ResourceType_RESOURCE_TYPE_UNSPECIFIED
 }
 
 type CheckResponse struct {
@@ -98,7 +147,7 @@ type CheckResponse struct {
 
 func (x *CheckResponse) Reset() {
 	*x = CheckResponse{}
-	mi := &file_access_proto_msgTypes[1]
+	mi := &file_api_proto_access_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -110,7 +159,7 @@ func (x *CheckResponse) String() string {
 func (*CheckResponse) ProtoMessage() {}
 
 func (x *CheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_access_proto_msgTypes[1]
+	mi := &file_api_proto_access_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -123,7 +172,7 @@ func (x *CheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckResponse.ProtoReflect.Descriptor instead.
 func (*CheckResponse) Descriptor() ([]byte, []int) {
-	return file_access_proto_rawDescGZIP(), []int{1}
+	return file_api_proto_access_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CheckResponse) GetAllowed() bool {
@@ -133,69 +182,78 @@ func (x *CheckResponse) GetAllowed() bool {
 	return false
 }
 
-var File_access_proto protoreflect.FileDescriptor
+var File_api_proto_access_proto protoreflect.FileDescriptor
 
-const file_access_proto_rawDesc = "" +
+const file_api_proto_access_proto_rawDesc = "" +
 	"\n" +
-	"\faccess.proto\x12\x06access\"\x8f\x01\n" +
+	"\x16api/proto/access.proto\x12\x06access\"\xac\x01\n" +
 	"\fCheckRequest\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x1f\n" +
 	"\vconsumer_id\x18\x02 \x01(\tR\n" +
 	"consumerId\x12#\n" +
-	"\rcontract_name\x18\x03 \x01(\tR\fcontractName\x12\x1c\n" +
-	"\tdirection\x18\x04 \x01(\tR\tdirection\")\n" +
+	"\rresource_name\x18\x03 \x01(\tR\fresourceName\x129\n" +
+	"\rresource_type\x18\x04 \x01(\x0e2\x14.access.ResourceTypeR\fresourceType\")\n" +
 	"\rCheckResponse\x12\x18\n" +
-	"\aallowed\x18\x01 \x01(\bR\aallowed2E\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed*G\n" +
+	"\fResourceType\x12\x1d\n" +
+	"\x19RESOURCE_TYPE_UNSPECIFIED\x10\x00\x12\n" +
+	"\n" +
+	"\x06METHOD\x10\x01\x12\f\n" +
+	"\bVARIABLE\x10\x022E\n" +
 	"\rAccessService\x124\n" +
 	"\x05Check\x12\x14.access.CheckRequest\x1a\x15.access.CheckResponseB6Z4github.com/onix-air/contacts/api/proto/access;accessb\x06proto3"
 
 var (
-	file_access_proto_rawDescOnce sync.Once
-	file_access_proto_rawDescData []byte
+	file_api_proto_access_proto_rawDescOnce sync.Once
+	file_api_proto_access_proto_rawDescData []byte
 )
 
-func file_access_proto_rawDescGZIP() []byte {
-	file_access_proto_rawDescOnce.Do(func() {
-		file_access_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_access_proto_rawDesc), len(file_access_proto_rawDesc)))
+func file_api_proto_access_proto_rawDescGZIP() []byte {
+	file_api_proto_access_proto_rawDescOnce.Do(func() {
+		file_api_proto_access_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_access_proto_rawDesc), len(file_api_proto_access_proto_rawDesc)))
 	})
-	return file_access_proto_rawDescData
+	return file_api_proto_access_proto_rawDescData
 }
 
-var file_access_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_access_proto_goTypes = []any{
-	(*CheckRequest)(nil),  // 0: access.CheckRequest
-	(*CheckResponse)(nil), // 1: access.CheckResponse
+var file_api_proto_access_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_api_proto_access_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_api_proto_access_proto_goTypes = []any{
+	(ResourceType)(0),     // 0: access.ResourceType
+	(*CheckRequest)(nil),  // 1: access.CheckRequest
+	(*CheckResponse)(nil), // 2: access.CheckResponse
 }
-var file_access_proto_depIdxs = []int32{
-	0, // 0: access.AccessService.Check:input_type -> access.CheckRequest
-	1, // 1: access.AccessService.Check:output_type -> access.CheckResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+var file_api_proto_access_proto_depIdxs = []int32{
+	0, // 0: access.CheckRequest.resource_type:type_name -> access.ResourceType
+	1, // 1: access.AccessService.Check:input_type -> access.CheckRequest
+	2, // 2: access.AccessService.Check:output_type -> access.CheckResponse
+	2, // [2:3] is the sub-list for method output_type
+	1, // [1:2] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_access_proto_init() }
-func file_access_proto_init() {
-	if File_access_proto != nil {
+func init() { file_api_proto_access_proto_init() }
+func file_api_proto_access_proto_init() {
+	if File_api_proto_access_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_access_proto_rawDesc), len(file_access_proto_rawDesc)),
-			NumEnums:      0,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_access_proto_rawDesc), len(file_api_proto_access_proto_rawDesc)),
+			NumEnums:      1,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_access_proto_goTypes,
-		DependencyIndexes: file_access_proto_depIdxs,
-		MessageInfos:      file_access_proto_msgTypes,
+		GoTypes:           file_api_proto_access_proto_goTypes,
+		DependencyIndexes: file_api_proto_access_proto_depIdxs,
+		EnumInfos:         file_api_proto_access_proto_enumTypes,
+		MessageInfos:      file_api_proto_access_proto_msgTypes,
 	}.Build()
-	File_access_proto = out.File
-	file_access_proto_goTypes = nil
-	file_access_proto_depIdxs = nil
+	File_api_proto_access_proto = out.File
+	file_api_proto_access_proto_goTypes = nil
+	file_api_proto_access_proto_depIdxs = nil
 }

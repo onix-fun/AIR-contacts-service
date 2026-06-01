@@ -16,8 +16,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/onix-air/contacts/internal/client"
+	"github.com/onix-air/contacts/internal/errorcatalog"
 	"github.com/onix-air/contacts/internal/model"
 	"github.com/onix-air/contacts/internal/observability"
+	pb "github.com/onix-air/contacts/internal/proto"
 )
 
 var upgrader = websocket.Upgrader{
@@ -28,8 +30,6 @@ var upgrader = websocket.Upgrader{
 
 const (
 	QoSAtLeastOnce = 1
-	AccessRead     = "READ"
-	AccessWrite    = "WRITE"
 	maxMessageSize = 64 * 1024
 )
 
@@ -166,18 +166,18 @@ func (ws *WebSocketService) SendMessage(conn *websocket.Conn, message interface{
 // ExecuteWrite handles write requests (via unified /ws)
 func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, req *model.WriteRequest, connectionID string) (*model.WSResponse, error) {
 	// Validate request
-	if req.RequestID == "" || req.ConsumerID == "" || req.ContractName == "" {
+	if req.RequestID == "" || req.ConsumerID == "" || req.MethodName == "" {
 		ws.publishAnalytics(ctx, analyticsEvent(
 			"invalid_message",
 			clientID,
 			connectionID,
 			req.RequestID,
 			req.ConsumerID,
-			req.ContractName,
+			req.MethodName,
 			"error",
 			"INVALID_MESSAGE",
 			"Invalid write request",
-			req.Payload,
+			req.Input,
 			nil,
 		))
 		return nil, fmt.Errorf("INVALID_MESSAGE")
@@ -189,16 +189,16 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 		connectionID,
 		req.RequestID,
 		req.ConsumerID,
-		req.ContractName,
+		req.MethodName,
 		"ok",
 		"",
 		"",
-		req.Payload,
+		req.Input,
 		nil,
 	))
 
 	// Check access
-	allowed, err := ws.access.Check(ctx, clientID, req.ConsumerID, req.ContractName, AccessWrite)
+	allowed, err := ws.access.Check(ctx, clientID, req.ConsumerID, req.MethodName, pb.ResourceType_METHOD)
 	if err != nil {
 		ws.logger.Printf("%s AccessService error: %v\n", observability.TraceFields(ctx), err)
 		ws.publishAnalytics(ctx, analyticsEvent(
@@ -207,7 +207,7 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 			connectionID,
 			req.RequestID,
 			req.ConsumerID,
-			req.ContractName,
+			req.MethodName,
 			"error",
 			"INTERNAL_ERROR",
 			err.Error(),
@@ -223,11 +223,11 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 			connectionID,
 			req.RequestID,
 			req.ConsumerID,
-			req.ContractName,
+			req.MethodName,
 			"denied",
 			"ACCESS_DENIED",
 			"Access denied",
-			req.Payload,
+			req.Input,
 			nil,
 		))
 		return nil, fmt.Errorf("ACCESS_DENIED")
@@ -237,7 +237,7 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 	metadata := &model.RequestMetadata{
 		ClientID:     clientID,
 		ConsumerID:   req.ConsumerID,
-		ContractName: req.ContractName,
+		MethodName:   req.MethodName,
 		ConnectionID: connectionID,
 	}
 	if err := ws.requestMgr.StoreRequest(ctx, req.RequestID, metadata); err != nil {
@@ -248,11 +248,11 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 			connectionID,
 			req.RequestID,
 			req.ConsumerID,
-			req.ContractName,
+			req.MethodName,
 			"error",
 			"INTERNAL_ERROR",
 			err.Error(),
-			req.Payload,
+			req.Input,
 			nil,
 		))
 		return nil, fmt.Errorf("INTERNAL_ERROR")
@@ -260,11 +260,11 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 
 	// Publish command to MQTT
 	cmdPayload := &model.MQTTCommandPayload{
-		RequestID:    req.RequestID,
-		ConsumerID:   req.ConsumerID,
-		ContractName: req.ContractName,
-		Payload:      req.Payload,
-		Timestamp:    time.Now().UTC().Format(time.RFC3339),
+		RequestID:  req.RequestID,
+		ConsumerID: req.ConsumerID,
+		MethodName: req.MethodName,
+		Input:      req.Input,
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
 	}
 
 	if err := ws.mqtt.PublishCommand(cmdPayload, req.ConsumerID); err != nil {
@@ -276,11 +276,11 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 			connectionID,
 			req.RequestID,
 			req.ConsumerID,
-			req.ContractName,
+			req.MethodName,
 			"error",
 			"MQTT_PUBLISH_FAILED",
 			err.Error(),
-			req.Payload,
+			req.Input,
 			nil,
 		))
 		return nil, fmt.Errorf("MQTT_PUBLISH_FAILED")
@@ -292,11 +292,11 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 		connectionID,
 		req.RequestID,
 		req.ConsumerID,
-		req.ContractName,
+		req.MethodName,
 		"ok",
 		"",
 		"",
-		req.Payload,
+		req.Input,
 		nil,
 	))
 
@@ -316,23 +316,17 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 				connectionID,
 				req.RequestID,
 				req.ConsumerID,
-				req.ContractName,
+				req.MethodName,
 				"error",
 				"TIMEOUT",
 				"Device did not respond in time",
-				req.Payload,
+				req.Input,
 				nil,
 			))
 
 			if conn, ok := ws.GetConnection(connectionID); ok {
-				wsResp := &model.WSResponse{
-					Type:         "error",
-					RequestID:    req.RequestID,
-					ConsumerID:   req.ConsumerID,
-					ContractName: req.ContractName,
-					Code:         "TIMEOUT",
-					Message:      "Device did not respond in time",
-				}
+				entry := errorcatalog.ByStatus(408)
+				wsResp := &model.WSResponse{Type: "error", RequestID: req.RequestID, StatusCode: entry.StatusCode, Code: entry.Code, Message: entry.Message}
 				_ = ws.SendMessage(conn, wsResp)
 			}
 		}
@@ -344,7 +338,7 @@ func (ws *WebSocketService) ExecuteWrite(ctx context.Context, clientID string, r
 
 // SubscribeToEvents handles a subscribe message on /ws.
 func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID string, req *model.ReadSubscribeRequest, connectionID string) (*model.SubscriptionResult, error) {
-	if req.ConsumerID == "" || len(req.Contracts) == 0 {
+	if req.ConsumerID == "" || len(req.Variables) == 0 {
 		ws.publishAnalytics(ctx, analyticsEvent(
 			"invalid_message",
 			clientID,
@@ -356,7 +350,7 @@ func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID stri
 			"INVALID_MESSAGE",
 			"Invalid read subscription request",
 			nil,
-			map[string]interface{}{"contracts": req.Contracts},
+			map[string]interface{}{"variables": req.Variables},
 		))
 		return nil, fmt.Errorf("INVALID_MESSAGE")
 	}
@@ -372,40 +366,40 @@ func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID stri
 		"",
 		"",
 		nil,
-		map[string]interface{}{"contracts": req.Contracts},
+		map[string]interface{}{"variables": req.Variables},
 	))
 
-	// Check access for each contract
-	allowedContracts := []string{}
-	deniedContracts := []string{}
-	for _, contract := range req.Contracts {
-		allowed, err := ws.access.Check(ctx, clientID, req.ConsumerID, contract, AccessRead)
+	// Check access for each variable
+	allowedVariables := []string{}
+	deniedVariables := []string{}
+	for _, variable := range req.Variables {
+		allowed, err := ws.access.Check(ctx, clientID, req.ConsumerID, variable, pb.ResourceType_VARIABLE)
 		if err != nil {
 			ws.logger.Printf("%s AccessService error: %v\n", observability.TraceFields(ctx), err)
-			ws.publishAnalytics(ctx, analyticsEvent(
+			ws.publishAnalytics(ctx, analyticsVariableEvent(
 				"access_error",
 				clientID,
 				connectionID,
 				"",
 				req.ConsumerID,
-				contract,
+				variable,
 				"error",
 				"INTERNAL_ERROR",
 				err.Error(),
 				nil,
 				nil,
 			))
-			deniedContracts = append(deniedContracts, contract)
+			deniedVariables = append(deniedVariables, variable)
 			continue
 		}
 		if allowed {
-			allowedContracts = append(allowedContracts, contract)
+			allowedVariables = append(allowedVariables, variable)
 		} else {
-			deniedContracts = append(deniedContracts, contract)
+			deniedVariables = append(deniedVariables, variable)
 		}
 	}
 
-	if len(allowedContracts) == 0 {
+	if len(allowedVariables) == 0 {
 		ws.publishAnalytics(ctx, analyticsEvent(
 			"access_denied",
 			clientID,
@@ -415,14 +409,14 @@ func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID stri
 			"",
 			"denied",
 			"ACCESS_DENIED",
-			"Access denied to requested contracts",
+			"Access denied to requested variables",
 			nil,
-			map[string]interface{}{"contracts": req.Contracts},
+			map[string]interface{}{"variables": req.Variables},
 		))
 		return &model.SubscriptionResult{
 			ConsumerID: req.ConsumerID,
-			Accepted:   allowedContracts,
-			Denied:     deniedContracts,
+			Accepted:   allowedVariables,
+			Denied:     deniedVariables,
 		}, nil
 	}
 
@@ -430,7 +424,7 @@ func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID stri
 	metadata := &model.SubscriptionMetadata{
 		ClientID:   clientID,
 		ConsumerID: req.ConsumerID,
-		Contracts:  allowedContracts,
+		Variables:  allowedVariables,
 	}
 	if err := ws.subsMgr.SaveConnectionMetadata(ctx, connectionID, metadata); err != nil {
 		ws.publishAnalytics(ctx, analyticsEvent(
@@ -444,22 +438,22 @@ func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID stri
 			"INTERNAL_ERROR",
 			err.Error(),
 			nil,
-			map[string]interface{}{"contracts": allowedContracts},
+			map[string]interface{}{"variables": allowedVariables},
 		))
 		return nil, err
 	}
 
-	// Add subscriptions for each allowed contract
-	for _, contract := range allowedContracts {
-		if err := ws.subsMgr.AddSubscription(ctx, req.ConsumerID, contract, connectionID); err != nil {
+	// Add subscriptions for each allowed variable
+	for _, variable := range allowedVariables {
+		if err := ws.subsMgr.AddSubscription(ctx, req.ConsumerID, variable, connectionID); err != nil {
 			ws.logger.Printf("%s Failed to add subscription: %v\n", observability.TraceFields(ctx), err)
-			ws.publishAnalytics(ctx, analyticsEvent(
+			ws.publishAnalytics(ctx, analyticsVariableEvent(
 				"subscription_store_failed",
 				clientID,
 				connectionID,
 				"",
 				req.ConsumerID,
-				contract,
+				variable,
 				"error",
 				"INTERNAL_ERROR",
 				err.Error(),
@@ -482,15 +476,15 @@ func (ws *WebSocketService) SubscribeToEvents(ctx context.Context, clientID stri
 		"",
 		nil,
 		map[string]interface{}{
-			"requested_contracts": req.Contracts,
-			"allowed_contracts":   allowedContracts,
+			"requested_variables": req.Variables,
+			"allowed_variables":   allowedVariables,
 		},
 	))
 
 	return &model.SubscriptionResult{
 		ConsumerID: req.ConsumerID,
-		Accepted:   allowedContracts,
-		Denied:     deniedContracts,
+		Accepted:   allowedVariables,
+		Denied:     deniedVariables,
 	}, nil
 }
 
@@ -509,32 +503,32 @@ func (ws *WebSocketService) UnsubscribeFromEvents(ctx context.Context, clientID 
 		return nil, fmt.Errorf("INVALID_MESSAGE")
 	}
 
-	requested := req.Contracts
+	requested := req.Variables
 	if len(requested) == 0 {
-		requested = metadata.Contracts
+		requested = metadata.Variables
 	}
 
 	removed := make([]string, 0, len(requested))
-	remaining := make([]string, 0, len(metadata.Contracts))
+	remaining := make([]string, 0, len(metadata.Variables))
 	removeSet := map[string]struct{}{}
-	for _, contract := range requested {
-		removeSet[contract] = struct{}{}
+	for _, variable := range requested {
+		removeSet[variable] = struct{}{}
 	}
-	for _, contract := range metadata.Contracts {
-		if _, shouldRemove := removeSet[contract]; shouldRemove {
-			if err := ws.subsMgr.RemoveSubscription(ctx, consumerID, contract, connectionID); err != nil {
+	for _, variable := range metadata.Variables {
+		if _, shouldRemove := removeSet[variable]; shouldRemove {
+			if err := ws.subsMgr.RemoveSubscription(ctx, consumerID, variable, connectionID); err != nil {
 				return nil, fmt.Errorf("INTERNAL_ERROR")
 			}
-			removed = append(removed, contract)
+			removed = append(removed, variable)
 			continue
 		}
-		remaining = append(remaining, contract)
+		remaining = append(remaining, variable)
 	}
 
 	if len(remaining) == 0 {
 		_ = ws.subsMgr.RemoveConnectionMetadata(ctx, connectionID)
 	} else {
-		metadata.Contracts = remaining
+		metadata.Variables = remaining
 		metadata.ConsumerID = consumerID
 		if err := ws.subsMgr.SaveConnectionMetadata(ctx, connectionID, metadata); err != nil {
 			return nil, fmt.Errorf("INTERNAL_ERROR")
@@ -552,7 +546,7 @@ func (ws *WebSocketService) UnsubscribeFromEvents(ctx context.Context, clientID 
 		"",
 		"",
 		nil,
-		map[string]interface{}{"contracts": removed},
+		map[string]interface{}{"variables": removed},
 	))
 
 	return &model.SubscriptionResult{
@@ -592,10 +586,13 @@ func (ws *WebSocketService) ListenMQTTEvents(ctx context.Context) error {
 }
 
 func (ws *WebSocketService) handleMQTTResponse(ctx context.Context, msg []byte) {
-	// Parse MQTT response
 	var response model.MQTTResponsePayload
-	if err := json.Unmarshal(msg, &response); err != nil {
-		ws.logger.Printf("%s Failed to parse MQTT response: %v\n", observability.TraceFields(ctx), err)
+	if err := json.Unmarshal(msg, &response); err != nil || response.RequestID == "" || response.StatusCode == 0 {
+		detail := "missing request_id or status_code"
+		if err != nil {
+			detail = err.Error()
+		}
+		ws.logger.Printf("%s Failed to parse MQTT response: %s\n", observability.TraceFields(ctx), detail)
 		ws.publishAnalytics(ctx, analyticsEvent(
 			"mqtt_response_parse_failed",
 			"",
@@ -605,14 +602,13 @@ func (ws *WebSocketService) handleMQTTResponse(ctx context.Context, msg []byte) 
 			"",
 			"error",
 			"INVALID_MESSAGE",
-			err.Error(),
+			detail,
 			json.RawMessage(msg),
 			nil,
 		))
 		return
 	}
 
-	// Get request metadata from Redis
 	metadata, err := ws.requestMgr.GetRequest(ctx, response.RequestID)
 	if err != nil {
 		ws.logger.Printf("%s Request not found for ID %s: %v\n", observability.TraceFields(ctx), response.RequestID, err)
@@ -621,60 +617,65 @@ func (ws *WebSocketService) handleMQTTResponse(ctx context.Context, msg []byte) 
 			"",
 			"",
 			response.RequestID,
-			response.ConsumerID,
-			response.ContractName,
+			"",
+			"",
 			"error",
 			"REQUEST_NOT_FOUND",
 			err.Error(),
-			response.Payload,
-			map[string]interface{}{"device_status": response.Status},
+			nil,
+			map[string]interface{}{"device_status_code": response.StatusCode},
 		))
 		return
 	}
+	defer ws.requestMgr.DeleteRequest(ctx, response.RequestID)
 
-	ws.publishAnalytics(ctx, analyticsEvent(
+	statusCode := response.StatusCode
+	entry := errorcatalog.ByStatus(statusCode)
+
+	responseEvent := analyticsEvent(
 		"mqtt_response_received",
 		metadata.ClientID,
 		metadata.ConnectionID,
 		response.RequestID,
-		response.ConsumerID,
-		response.ContractName,
-		response.Status,
+		metadata.ConsumerID,
+		metadata.MethodName,
 		"",
-		"",
-		response.Payload,
-		map[string]interface{}{"device_status": response.Status},
-	))
+		entry.Code,
+		entry.Message,
+		nil,
+		nil,
+	)
+	responseEvent.StatusCode = &statusCode
+	ws.publishAnalytics(ctx, responseEvent)
 
-	// Get connection
 	conn, ok := ws.GetConnection(metadata.ConnectionID)
 	if !ok {
 		ws.logger.Printf("%s Connection not found for ID %s\n", observability.TraceFields(ctx), metadata.ConnectionID)
-		ws.publishAnalytics(ctx, analyticsEvent(
+		ws.publishAnalytics(ctx, analyticsVariableEvent(
 			"connection_not_found",
 			metadata.ClientID,
 			metadata.ConnectionID,
 			response.RequestID,
-			response.ConsumerID,
-			response.ContractName,
+			metadata.ConsumerID,
+			metadata.MethodName,
 			"error",
 			"CONNECTION_NOT_FOUND",
 			"Connection not found",
-			response.Payload,
+			nil,
 			nil,
 		))
 		return
 	}
 
-	// Send response to user
 	wsResp := &model.WSResponse{
-		Type:         "success",
-		RequestID:    response.RequestID,
-		ConsumerID:   response.ConsumerID,
-		ContractName: response.ContractName,
-		Status:       response.Status,
-		Payload:      response.Payload,
-		Timestamp:    response.Timestamp,
+		Type:       "success",
+		RequestID:  response.RequestID,
+		StatusCode: statusCode,
+	}
+	if statusCode != 200 {
+		wsResp.Type = "error"
+		wsResp.Code = entry.Code
+		wsResp.Message = entry.Message
 	}
 
 	if err := ws.SendMessage(conn, wsResp); err != nil {
@@ -684,24 +685,25 @@ func (ws *WebSocketService) handleMQTTResponse(ctx context.Context, msg []byte) 
 			metadata.ClientID,
 			metadata.ConnectionID,
 			response.RequestID,
-			response.ConsumerID,
-			response.ContractName,
+			metadata.ConsumerID,
+			metadata.MethodName,
 			"error",
 			"INTERNAL_ERROR",
 			err.Error(),
-			response.Payload,
+			nil,
 			nil,
 		))
 	}
-
-	// Clean up request from Redis
-	ws.requestMgr.DeleteRequest(ctx, response.RequestID)
 }
 
 func (ws *WebSocketService) handleMQTTEvent(ctx context.Context, msg []byte) {
 	// Parse MQTT event
 	var event model.MQTTEventPayload
-	if err := json.Unmarshal(msg, &event); err != nil {
+	if err := json.Unmarshal(msg, &event); err != nil || event.ConsumerID == "" || event.VariableName == "" {
+		detail := "missing consumer_id or variable_name"
+		if err != nil {
+			detail = err.Error()
+		}
 		ws.logger.Printf("%s Failed to parse MQTT event: %v\n", observability.TraceFields(ctx), err)
 		ws.publishAnalytics(ctx, analyticsEvent(
 			"device_event_parse_failed",
@@ -712,7 +714,7 @@ func (ws *WebSocketService) handleMQTTEvent(ctx context.Context, msg []byte) {
 			"",
 			"error",
 			"INVALID_MESSAGE",
-			err.Error(),
+			detail,
 			json.RawMessage(msg),
 			nil,
 		))
@@ -722,23 +724,23 @@ func (ws *WebSocketService) handleMQTTEvent(ctx context.Context, msg []byte) {
 	deviceEvent := model.NewAnalyticsEvent("device_event")
 	deviceEvent.Source = "device"
 	deviceEvent.ConsumerID = event.ConsumerID
-	deviceEvent.ContractName = event.ContractName
+	deviceEvent.VariableName = event.VariableName
 	deviceEvent.Status = "ok"
 	deviceEvent.Payload = event.Payload
 	deviceEvent.Metadata = map[string]interface{}{"device_ts": event.Timestamp}
 	ws.publishAnalytics(ctx, deviceEvent)
 
-	// Get all subscribers for this contract
-	subscribers, err := ws.subsMgr.GetSubscribers(ctx, event.ConsumerID, event.ContractName)
+	// Get all subscribers for this variable
+	subscribers, err := ws.subsMgr.GetSubscribers(ctx, event.ConsumerID, event.VariableName)
 	if err != nil {
 		ws.logger.Printf("%s Failed to get subscribers: %v\n", observability.TraceFields(ctx), err)
-		ws.publishAnalytics(ctx, analyticsEvent(
+		ws.publishAnalytics(ctx, analyticsVariableEvent(
 			"subscribers_lookup_failed",
 			"",
 			"",
 			"",
 			event.ConsumerID,
-			event.ContractName,
+			event.VariableName,
 			"error",
 			"INTERNAL_ERROR",
 			err.Error(),
@@ -752,7 +754,7 @@ func (ws *WebSocketService) handleMQTTEvent(ctx context.Context, msg []byte) {
 	wsEvent := &model.WSResponse{
 		Type:         "event",
 		ConsumerID:   event.ConsumerID,
-		ContractName: event.ContractName,
+		VariableName: event.VariableName,
 		Payload:      event.Payload,
 		Timestamp:    event.Timestamp,
 	}
@@ -761,13 +763,13 @@ func (ws *WebSocketService) handleMQTTEvent(ctx context.Context, msg []byte) {
 		if conn, ok := ws.GetConnection(connID); ok {
 			if err := ws.SendMessage(conn, wsEvent); err != nil {
 				ws.logger.Printf("%s Failed to send event to connection %s: %v\n", observability.TraceFields(ctx), connID, err)
-				ws.publishAnalytics(ctx, analyticsEvent(
+				ws.publishAnalytics(ctx, analyticsVariableEvent(
 					"websocket_send_failed",
 					"",
 					connID,
 					"",
 					event.ConsumerID,
-					event.ContractName,
+					event.VariableName,
 					"error",
 					"INTERNAL_ERROR",
 					err.Error(),
@@ -799,7 +801,7 @@ func analyticsEvent(
 	connectionID string,
 	requestID string,
 	consumerID string,
-	contractName string,
+	methodName string,
 	status string,
 	errorCode string,
 	errorMessage string,
@@ -811,12 +813,30 @@ func analyticsEvent(
 	event.ConnectionID = connectionID
 	event.RequestID = requestID
 	event.ConsumerID = consumerID
-	event.ContractName = contractName
+	event.MethodName = methodName
 	event.Status = status
 	event.ErrorCode = errorCode
 	event.ErrorMessage = errorMessage
 	event.Payload = payload
 	event.Metadata = metadata
+	return event
+}
+
+func analyticsVariableEvent(
+	action string,
+	clientID string,
+	connectionID string,
+	requestID string,
+	consumerID string,
+	variableName string,
+	status string,
+	errorCode string,
+	errorMessage string,
+	payload json.RawMessage,
+	metadata map[string]interface{},
+) *model.AnalyticsEvent {
+	event := analyticsEvent(action, clientID, connectionID, requestID, consumerID, "", status, errorCode, errorMessage, payload, metadata)
+	event.VariableName = variableName
 	return event
 }
 

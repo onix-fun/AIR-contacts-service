@@ -27,7 +27,7 @@ func TestAnalyticsEventJSONShape(t *testing.T) {
 	event := NewAnalyticsEvent("write_request_received")
 	event.ClientID = "00000000-0000-0000-0000-000000000001"
 	event.ConsumerID = "00000000-0000-0000-0000-000000000002"
-	event.ContractName = "relay.set"
+	event.MethodName = "relay.set"
 	event.Payload = json.RawMessage(`{"state":true}`)
 	event.Metadata = map[string]interface{}{"mode": "write"}
 

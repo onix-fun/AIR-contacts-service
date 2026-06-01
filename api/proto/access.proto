@@ -8,11 +8,17 @@ service AccessService {
   rpc Check(CheckRequest) returns (CheckResponse);
 }
 
+enum ResourceType {
+  RESOURCE_TYPE_UNSPECIFIED = 0;
+  METHOD = 1;
+  VARIABLE = 2;
+}
+
 message CheckRequest {
   string client_id = 1;
   string consumer_id = 2;
-  string contract_name = 3;
-  string direction = 4;
+  string resource_name = 3;
+  ResourceType resource_type = 4;
 }
 
 message CheckResponse {

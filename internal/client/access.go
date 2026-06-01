@@ -39,9 +39,9 @@ func (ac *AccessServiceClient) Close() error {
 	return ac.conn.Close()
 }
 
-// Check checks if client has access to contract on consumer for READ or WRITE direction.
+// Check checks if a client can use a named method or variable on a consumer.
 // clientID and consumerID should be valid UUIDs
-func (ac *AccessServiceClient) Check(ctx context.Context, clientID, consumerID, contractName, direction string) (bool, error) {
+func (ac *AccessServiceClient) Check(ctx context.Context, clientID, consumerID, resourceName string, resourceType pb.ResourceType) (bool, error) {
 	// Validate UUIDs
 	if _, err := uuid.Parse(clientID); err != nil {
 		return false, err
@@ -53,8 +53,8 @@ func (ac *AccessServiceClient) Check(ctx context.Context, clientID, consumerID, 
 	req := &pb.CheckRequest{
 		ClientId:     clientID,
 		ConsumerId:   consumerID,
-		ContractName: contractName,
-		Direction:    direction,
+		ResourceName: resourceName,
+		ResourceType: resourceType,
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

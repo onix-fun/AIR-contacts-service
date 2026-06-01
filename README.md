@@ -81,8 +81,8 @@ go run ./cmd/device-ws
   "type": "command",
   "request_id": "uuid",
   "consumer_id": "device-1",
-  "contract_name": "relay.set",
-  "payload": {
+  "method_name": "relay.set",
+  "input": {
     "state": true
   }
 }
@@ -98,13 +98,7 @@ X-Client-ID: user-uuid (set by Gateway)
 {
   "type": "success",
   "request_id": "uuid",
-  "consumer_id": "device-1",
-  "contract_name": "relay.set",
-  "status": "ok",
-  "payload": {
-    "state": true
-  },
-  "ts": "2026-05-24T12:00:01Z"
+  "status_code": 200
 }
 ```
 
@@ -125,7 +119,7 @@ X-Client-ID: user-uuid (set by Gateway)
 {
   "type": "subscribe",
   "consumer_id": "device-1",
-  "contracts": [
+  "variables": [
     "temperature",
     "humidity",
     "battery.level"
@@ -149,7 +143,7 @@ X-Client-ID: user-uuid (set by Gateway)
 {
   "type": "unsubscribe",
   "consumer_id": "device-1",
-  "contracts": ["humidity"]
+  "variables": ["humidity"]
 }
 ```
 
@@ -158,7 +152,7 @@ X-Client-ID: user-uuid (set by Gateway)
 {
   "type": "event",
   "consumer_id": "device-1",
-  "contract_name": "temperature",
+  "variable_name": "temperature",
   "payload": {
     "value": 23.5
   },
@@ -171,7 +165,7 @@ X-Client-ID: user-uuid (set by Gateway)
 {
   "type": "error",
   "code": "ACCESS_DENIED",
-  "message": "Access denied to requested contracts"
+  "message": "Access denied"
 }
 ```
 
@@ -181,7 +175,7 @@ X-Client-ID: user-uuid (set by Gateway)
 |------|----------|
 | `ACCESS_DENIED` | Клиент не имеет прав на операцию |
 | `INVALID_MESSAGE` | Некорректный формат сообщения |
-| `INVALID_CONTRACT` | Неизвестный контракт |
+| `INVALID_METHOD` | Неизвестный метод |
 | `MQTT_PUBLISH_FAILED` | Ошибка публикации в MQTT |
 | `TIMEOUT` | Таймаут ответа от устройства (30s) |
 | `INTERNAL_ERROR` | Внутренняя ошибка сервера |
@@ -198,8 +192,8 @@ Payload:
 {
   "request_id": "uuid",
   "consumer_id": "device-1",
-  "contract_name": "relay.set",
-  "payload": {...},
+  "method_name": "relay.set",
+  "input": {...},
   "ts": "2026-05-24T12:00:00Z"
 }
 ```
@@ -213,11 +207,7 @@ Payload:
 ```json
 {
   "request_id": "uuid",
-  "consumer_id": "device-1",
-  "contract_name": "relay.set",
-  "status": "ok",
-  "payload": {...},
-  "ts": "2026-05-24T12:00:01Z"
+  "status_code": 200
 }
 ```
 
@@ -230,7 +220,7 @@ Payload:
 ```json
 {
   "consumer_id": "device-1",
-  "contract_name": "temperature",
+  "variable_name": "temperature",
   "payload": {"value": 23.5},
   "ts": "2026-05-24T12:00:00Z"
 }
@@ -246,7 +236,7 @@ analytics.events
 
 ```
 ws:req:{request_id}              # Request metadata (TTL 30s)
-ws:subs:{consumer_id}:{contract} # Set of connected users
+ws:subs:{consumer_id}:{variable} # Set of connected users
 ws:conn:{connection_id}          # Connection metadata (TTL 1h)
 ```
 
